@@ -45,6 +45,11 @@ options:
         - Group description
      required: false
      default: None
+   domain_id:
+     description:
+        - Domain id to create the group in if the cloud supports domains.
+     required: false
+     default: None
    state:
      description:
        - Should the resource be present or absent.
@@ -62,6 +67,7 @@ EXAMPLES = '''
     state: present
     name: demo
     description: "Demo Group"
+    domain_id: demoid
 
 # Update the description on existing "demo" group
 - os_group:
@@ -69,6 +75,7 @@ EXAMPLES = '''
     state: present
     name: demo
     description: "Something else"
+    domain_id: demoid
 
 # Delete group named "demo"
 - os_group:
@@ -116,6 +123,7 @@ def main():
     argument_spec = openstack_full_argument_spec(
         name=dict(required=True),
         description=dict(required=False, default=None),
+        domain_id=dict(required=False, default=None),
         state=dict(default='present', choices=['absent', 'present']),
     )
 
@@ -129,11 +137,12 @@ def main():
 
     name = module.params.pop('name')
     description = module.params.pop('description')
+    domain_id = module.params.pop('domain_id')
     state = module.params.pop('state')
 
     try:
         cloud = shade.operator_cloud(**module.params)
-        group = cloud.get_group(name)
+        group = cloud.get_group(name, filters={'domain_id': domain_id})
 
         if module.check_mode:
             module.exit_json(changed=_system_state_change(state, description, group))
@@ -141,7 +150,7 @@ def main():
         if state == 'present':
             if group is None:
                 group = cloud.create_group(
-                    name=name, description=description)
+                    name=name, description=description, domain=domain_id)
                 changed = True
             else:
                 if description is not None and group.description != description:
